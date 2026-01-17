@@ -95,3 +95,48 @@ ggplot(plot_data_representative, aes(x = time)) +
     panel.grid.minor = element_blank()
   )
 ```
+
+```{r}
+#| label: fig-arrhythmia-distribution
+#| fig-cap: "Distribution of pathological samples."
+#| fig-width: 8
+#| fig-height: 5
+
+# Data preparation
+arrhythmia_counts <- ecg_clean %>% 
+  filter(label_name != "Normal") %>% 
+  count(label_name, color_group) %>% 
+  mutate(
+    percentage = n / sum(n) * 100,
+    label_text = sprintf("%s (%.1f%%)", scales::comma(n), percentage)
+  )
+# Data visualization
+ggplot(arrhythmia_counts, aes(x = reorder(label_name, n), y = n, fill = color_group)) +
+  # Horizontal bars for better readability
+  geom_col(width = 0.7, alpha = 0.7) +
+  
+  # Labels
+  geom_text(aes(label = label_text),
+            hjust = -0.1,
+            size = 3.8,
+            fontface = "bold") +
+  coord_flip() +
+  scale_fill_manual(values = ecg_palette) +
+  # Ensure space for text on the right side
+  scale_y_continuous(expand = expansion(mult = c(0, 0.25))) +
+  
+  labs(
+    title = "Prevalence of Arrhythmia Sub-classes",
+    subtitle = "Relative distribution of pathological samples",
+    x = NULL,
+    y = "Number of Samples (n)"
+  ) +
+  
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", size = 14),
+    panel.grid.major.y = element_blank(),
+    axis.text.y = element_text(face = "bold", size = 11)
+  )
+```
