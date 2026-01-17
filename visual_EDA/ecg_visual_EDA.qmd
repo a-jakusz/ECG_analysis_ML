@@ -140,3 +140,57 @@ ggplot(arrhythmia_counts, aes(x = reorder(label_name, n), y = n, fill = color_gr
     axis.text.y = element_text(face = "bold", size = 11)
   )
 ```
+
+```{r}
+#| label: fig-arrhythmia-variance
+#| fig-cap: "Intra-class variance across abnormal heartbeat categories."
+#| fig-width: 8
+#| fig-height: 10
+
+# Aggregating data to show the essense of each class plus its variability
+stats_plot_data <- ecg_clean %>% 
+  pivot_longer(cols = starts_with("t"), names_to = "time", values_to = "amplitude") %>% 
+  mutate(time = as.numeric(gsub("t", "", time))) %>% 
+  group_by(label_name, color_group, time) %>% 
+  summarise(
+    mean_amp = mean(amplitude, na.rm = TRUE),
+    sd_amp = sd(amplitude, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Filtering data to focus only on Arrhythmias
+pathology_stats <- stats_plot_data %>% 
+  filter(label_name != "Normal")
+
+# Visualization
+ggplot(pathology_stats, aes(x = time)) +
+  # Class-specific variability (ribbon)
+  geom_ribbon(aes(ymin = mean_amp - sd_amp, ymax = mean_amp + sd_amp,
+                  fill = color_group), alpha = 0.15) +
+  
+  # Primary mean signal line
+  geom_line(aes(y = mean_amp, color = color_group), linewidth = 1) +
+  
+  facet_wrap(~ label_name, ncol = 1, scales = "free_y") +
+  
+  # Colot mapping
+  scale_color_manual(values = ecg_palette) +
+  scale_fill_manual(values = ecg_palette) +
+  labs(
+    title = "Statistical Class Morphology Analysys",
+    subtitle = "Aggregated mean waveforms with +/- 1 standard deviation confidence ribbons",
+    x = "Normalized Time Index (t)",
+    y = "Voltage Amplitude (mV)",
+    color = "Clinical Status",
+    fill = "Clinical Status"
+  ) +
+  
+  # Styling the plot
+  theme_minimal(base_size = 11) + 
+  theme(
+    legend.position = "none", # legend removed: redundant with facet title
+    strip.text = element_text(face = "bold", size = 12),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold", size = 14)
+  )
+```
