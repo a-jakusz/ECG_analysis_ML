@@ -43,3 +43,55 @@ ecg_clean <- ecg_raw %>%
 # Setting a seed ensures that the 'random' selections is the same every time
 set.seed(20)
 ```
+
+```{r}
+#| label: fig-raw-representative
+#| fig-cap: "Representative raw samples compared to healthy baseline."
+#| fig-width: 8
+#| fig-height: 10
+
+# Get one representative raw samle for each abnormal class (1-4)
+raw_samples <- ecg_clean %>% 
+  filter(label != 0) %>% 
+  group_by(label_name) %>% 
+  slice_sample(n = 1) %>% 
+  ungroup() %>% 
+  pivot_longer(cols = starts_with("t"), names_to = "time", values_to = "raw_amp") %>% 
+  mutate(time = as.numeric(gsub("t", "", time)))
+
+# Get a single 'Normal' beat to serveas the 'Healthy Reference' background
+normal_baseline <- raw_sample_normal %>% 
+  select(time, normal_sample_amplitude)
+
+# Combine for plotting
+plot_data_representative <- raw_samples %>% 
+  left_join(normal_baseline, by = "time")
+
+# Visualization
+ggplot(plot_data_representative, aes(x = time)) +
+  # Background - healthy baseline reference for morphological comparison
+  geom_line(aes(y = normal_sample_amplitude, color = "Normal Reference"),
+            linetype = "dashed", linewidth = 0.5) +
+  # Main signal - single raw representative heartbreat for each clinical category
+  geom_line(aes(y = raw_amp, color = color_group), linewidth = 0.8) +
+
+  facet_wrap(~ label_name, ncol = 1, scales = "free_y") +
+  # Applying the global medicine palette
+  scale_color_manual(values = ecg_palette) +
+  # Labels
+  labs(
+    title = "Individual Arrhythmia Heartbeat Samples",
+    subtitle = "Single-sample morphology comparison against a healthy reference",
+    x = "Normalized Time Index (t)",
+    y = "Voltage Amplitude (mV)",
+    color = "Clinical Status"
+  ) +
+  
+  # Styling the plot
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(face = "bold", size = 12),
+    panel.grid.minor = element_blank()
+  )
+```
