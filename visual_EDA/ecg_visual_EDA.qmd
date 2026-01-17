@@ -239,3 +239,41 @@ ggplot(ecg_time_stats, aes(x = label_name, y = r_peak_time)) +
     axis.text.y = element_text(face = "bold")
   )
 ```
+
+```{r}
+#| label: fig-technical-zones
+#| fig-width: 9
+#| fig-height: 5
+
+# Define zones at plot
+zones <- data.frame(
+  xmin = c(0, 98),
+  xmax = c(10, 110),
+  Zone = c("Technical Artifact", 'QRS Complex')
+)
+
+ggplot() +
+  # Shaded area
+  geom_rect(data = zones, aes(xmin = xmin,, xmax = xmax, ymin = -Inf, ymax = Inf, fill = Zone), alpha = 0.2)+
+  # Main signal
+  geom_line(data = tech_sample, aes(x = time, y = amplitude), color = ecg_palette["Normal"], linewidth = 0.8) +
+  # New colors
+  scale_fill_manual(values = c(
+    "Technical Artifact" = "#4682B4",
+    "QRS Complex" = "#9932CC"
+  )) +
+  
+  labs(
+    title = "Signal anatomy and preprocessing audit",
+    subtitle = "Distrobution between technical cropping artifacts and physiological waveforms",
+    x = "Time Index (t)",
+    y = "Voltage Amplitude",
+    fill = "Signal Components",
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold", size = 14)
+  )
+```
