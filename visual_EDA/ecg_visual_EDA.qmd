@@ -1,0 +1,45 @@
+---
+title: "ecg_visual_EDA"
+format: html
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+
+library(tidyverse)
+
+# Define a consistent medical color mpalette for visual identity across all plots
+ecg_palette <- c(
+  "Normal" = "#4a4b4c",
+  "Arrhythmia" = "#d73027",
+  "Normal Reference" = "#b3b4b5"
+)
+
+zip_path <- "../data/mitbih_test.zip"
+
+# Stream data directly from ZIP archive to optimize disk usage
+ecg_raw <- read_csv(unz(zip_path, "mitbih_test.csv"), col_names = FALSE)
+
+colnames(ecg_raw) <- c(paste0("t", 1:(ncol(ecg_raw) - 1)), "label")
+
+# Map numeric labels to clinical categories and group by diagnostic significance
+ecg_clean <- ecg_raw %>% 
+  mutate(
+    label_name = case_when(
+      label == 0 ~ "Normal",
+      label == 1 ~ "Supraventricular",
+      label == 2 ~ "Ventricular",
+      label == 3 ~ "Fusion",
+      label == 4 ~ "Unclassified",
+      TRUE ~ as.character(label)
+    ),
+    # Grouping for high-level morphological comparision
+    color_group = ifelse(label == 0, "Normal", "Arrhythmia")
+  )
+
+# Setting a seed ensures that the 'random' selections is the same every time
+set.seed(20)
+```
