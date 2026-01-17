@@ -194,3 +194,48 @@ ggplot(pathology_stats, aes(x = time)) +
     plot.title = element_text(face = "bold", size = 14)
   )
 ```
+
+```{r}
+#| fig-height: 12
+#| fig-width: 9
+#| warning: false
+
+# Preprocessing
+ecg_time_stats <- ecg_clean %>% 
+  mutate(sample_id = row_number()) %>% 
+  filter(label != 0) %>% 
+  pivot_longer(cols = starts_with("t"), names_to = "time", values_to = "amplitude") %>% 
+  mutate(time = as.numeric(str_remove(time, "t"))) %>% 
+  # Skip points with t < 10 - remove initial artefact
+  filter(time > 10) %>% 
+  # Find peak for each sample
+  group_by(sample_id, label_name, color_group) %>% 
+  summarise(
+    r_peak_time = time[which.max(amplitude)],
+    .groups = "drop"
+  )
+
+# Data visualization
+ggplot(ecg_time_stats, aes(x = label_name, y = r_peak_time)) +
+  # Violin plot 
+  geom_violin(fill = ecg_palette["Arrhythmia"], alpha = 0.3, color = NA, scale = "width", trim = FALSE) +
+  # Jitter
+  geom_jitter(color = ecg_palette["Arrhythmia"], alpha = 0.5, width = 0.2, size = 0.3) +
+  # Boxplot
+  geom_boxplot(width = 0.1, color = "#001111", alpha = 0.8, outlier.shape = NA) +
+  
+  coord_flip() +
+  labs(
+    title = "Temporal Instability of Pathological R-peaks",
+    subtitle = "Combined view of raw data (jitter), density (violin), and statistics (boxplot)",
+    x = "Arrhythmia Type",
+    y = "R-Peak Position (Sample Index [t])"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold", size = 10),
+    axis.text.y = element_text(face = "bold")
+  )
+```
