@@ -245,30 +245,40 @@ ggplot(ecg_time_stats, aes(x = label_name, y = r_peak_time)) +
 #| fig-width: 9
 #| fig-height: 5
 
-# Define zones at plot
-zones <- data.frame(
-  xmin = c(0, 98),
-  xmax = c(10, 110),
-  Zone = c("Technical Artifact", 'QRS Complex')
+# Data prepossessing
+tech_baseline <- ecg_clean %>% 
+  filter(label == 0) %>% 
+  slice(1) %>% 
+  # select only signal columns
+  select(starts_with("t")) %>% 
+  pivot_longer(everything(), names_to = "time", values_to = "amplitude") %>% 
+  mutate(time = as.numeric(gsub("t", "", time)))
+
+# Define colors and alpha levels
+tech_settings <- data.frame(
+  type = c("Artifact", "QRS Complex", "Baseline"),
+  color = c("#4575b4", "#762a83", ecg_palette["Normal"]),
+  alpha = c(1, 1, 0.25)
 )
 
-ggplot() +
-  # Shaded area
-  geom_rect(data = zones, aes(xmin = xmin,, xmax = xmax, ymin = -Inf, ymax = Inf, fill = Zone), alpha = 0.2)+
-  # Main signal
-  geom_line(data = tech_sample, aes(x = time, y = amplitude), color = ecg_palette["Normal"], linewidth = 0.8) +
-  # New colors
-  scale_fill_manual(values = c(
-    "Technical Artifact" = "#4682B4",
-    "QRS Complex" = "#9932CC"
-  )) +
-  
+tech_sample_plot <- tech_baseline  %>% 
+  mutate(type = case_when(
+    time <= 10 ~ "Artifact",
+    time >= 98 & time <= 110 ~ "QRS Complex",
+    TRUE ~ "Baseline"
+  ))
+
+ggplot(tech_sample_plot, aes(x = time, y = amplitude, group = 1)) +
+  # Normal ecg signal
+  geom_line(aes(color = type, alpha = type), linewidth = 1.1) +
+  # Manual parameter setting
+  scale_color_manual(values = setNames(tech_settings$color, tech_settings$type)) +
+  scale_alpha_manual(values = setNames(tech_settings$alpha, tech_settings$type)) +
   labs(
-    title = "Signal anatomy and preprocessing audit",
-    subtitle = "Distrobution between technical cropping artifacts and physiological waveforms",
+    title = "Signal anatomy",
+    subtitle = "Highlighting critical segments.",
     x = "Time Index (t)",
-    y = "Voltage Amplitude",
-    fill = "Signal Components",
+    y = "Voltage Amplitude"
   ) +
   theme_minimal(base_size = 12) +
   theme(
