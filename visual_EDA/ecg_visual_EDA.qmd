@@ -1,6 +1,9 @@
 ---
 title: "ecg_visual_EDA"
-format: html
+format:
+  html:
+    code-fold: true
+    toc: true
 editor: visual
 ---
 
@@ -11,23 +14,31 @@ editor: visual
 
 library(tidyverse)
 
-# Define a consistent medical color mpalette for visual identity across all plots
+# Define a consistent medical color palette for visual identity across all plots
 ecg_palette <- c(
   "Normal" = "#4a4b4c",
   "Arrhythmia" = "#d73027",
-  "Normal Reference" = "#b3b4b5"
+  "Normal Reference" = "#b3b4b5",
+  "QRS Complex" = "#4395b4"
 )
 
+# Setting a seed ensures that the 'random' selections are the same every time
+set.seed(20)
 zip_path <- "../data/mitbih_test.zip"
+```
 
-# Stream data directly from ZIP archive to optimize disk usage
+```{r}
+#| label: global-preprocessing
+#| message: false
+
+# Load and basic clean
 ecg_raw <- read_csv(unz(zip_path, "mitbih_test.csv"), col_names = FALSE)
-
 colnames(ecg_raw) <- c(paste0("t", 1:(ncol(ecg_raw) - 1)), "label")
 
-# Map numeric labels to clinical categories and group by diagnostic significance
-ecg_clean <- ecg_raw %>% 
+# Create a clean, tidy long-format dataset
+ecg_tidy <- ecg_raw %>% 
   mutate(
+    sample_id = row_number(),
     label_name = case_when(
       label == 0 ~ "Normal",
       label == 1 ~ "Supraventricular",
@@ -36,121 +47,19 @@ ecg_clean <- ecg_raw %>%
       label == 4 ~ "Unclassified",
       TRUE ~ as.character(label)
     ),
-    # Grouping for high-level morphological comparision
     color_group = ifelse(label == 0, "Normal", "Arrhythmia")
-  )
+  ) 
 
-# Setting a seed ensures that the 'random' selections is the same every time
-set.seed(20)
-```
+ecg_long <- ecg_tidy %>% 
+  pivot_longer(
+    cols = starts_with("t"),
+    names_to = "time",
+    values_to = "amplitude",
+  ) %>% 
+  mutate(time = as.numeric(str_remove(time, "t")))
 
-```{r}
-#| label: fig-raw-representative
-#| fig-cap: "Representative raw samples compared to healthy baseline."
-#| fig-width: 8
-#| fig-height: 10
-
-# Get one representative raw samle for each abnormal class (1-4)
-raw_samples <- ecg_clean %>% 
-  filter(label != 0) %>% 
-  group_by(label_name) %>% 
-  slice_sample(n = 1) %>% 
-  ungroup() %>% 
-  pivot_longer(cols = starts_with("t"), names_to = "time", values_to = "raw_amp") %>% 
-  mutate(time = as.numeric(gsub("t", "", time)))
-
-# Get a single 'Normal' beat to serveas the 'Healthy Reference' background
-normal_baseline <- raw_sample_normal %>% 
-  select(time, normal_sample_amplitude)
-
-# Combine for plotting
-plot_data_representative <- raw_samples %>% 
-  left_join(normal_baseline, by = "time")
-
-# Visualization
-ggplot(plot_data_representative, aes(x = time)) +
-  # Background - healthy baseline reference for morphological comparison
-  geom_line(aes(y = normal_sample_amplitude, color = "Normal Reference"),
-            linetype = "dashed", linewidth = 0.5) +
-  # Main signal - single raw representative heartbreat for each clinical category
-  geom_line(aes(y = raw_amp, color = color_group), linewidth = 0.8) +
-
-  facet_wrap(~ label_name, ncol = 1, scales = "free_y") +
-  # Applying the global medicine palette
-  scale_color_manual(values = ecg_palette) +
-  # Labels
-  labs(
-    title = "Individual Arrhythmia Heartbeat Samples",
-    subtitle = "Single-sample morphology comparison against a healthy reference",
-    x = "Normalized Time Index (t)",
-    y = "Voltage Amplitude (mV)",
-    color = "Clinical Status"
-  ) +
-  
-  # Styling the plot
-  theme_minimal(base_size = 11) +
-  theme(
-    legend.position = "bottom",
-    strip.text = element_text(face = "bold", size = 12),
-    panel.grid.minor = element_blank()
-  )
-```
-
-```{r}
-#| label: fig-arrhythmia-distribution
-#| fig-cap: "Distribution of pathological samples."
-#| fig-width: 8
-#| fig-height: 5
-
-# Data preparation
-arrhythmia_counts <- ecg_clean %>% 
-  filter(label_name != "Normal") %>% 
-  count(label_name, color_group) %>% 
-  mutate(
-    percentage = n / sum(n) * 100,
-    label_text = sprintf("%s (%.1f%%)", scales::comma(n), percentage)
-  )
-# Data visualization
-ggplot(arrhythmia_counts, aes(x = reorder(label_name, n), y = n, fill = color_group)) +
-  # Horizontal bars for better readability
-  geom_col(width = 0.7, alpha = 0.7) +
-  
-  # Labels
-  geom_text(aes(label = label_text),
-            hjust = -0.1,
-            size = 3.8,
-            fontface = "bold") +
-  coord_flip() +
-  scale_fill_manual(values = ecg_palette) +
-  # Ensure space for text on the right side
-  scale_y_continuous(expand = expansion(mult = c(0, 0.25))) +
-  
-  labs(
-    title = "Prevalence of Arrhythmia Sub-classes",
-    subtitle = "Relative distribution of pathological samples",
-    x = NULL,
-    y = "Number of Samples (n)"
-  ) +
-  
-  theme_minimal(base_size = 11) +
-  theme(
-    legend.position = "none",
-    plot.title = element_text(face = "bold", size = 14),
-    panel.grid.major.y = element_blank(),
-    axis.text.y = element_text(face = "bold", size = 11)
-  )
-```
-
-```{r}
-#| label: fig-arrhythmia-variance
-#| fig-cap: "Intra-class variance across abnormal heartbeat categories."
-#| fig-width: 8
-#| fig-height: 10
-
-# Aggregating data to show the essense of each class plus its variability
-stats_plot_data <- ecg_clean %>% 
-  pivot_longer(cols = starts_with("t"), names_to = "time", values_to = "amplitude") %>% 
-  mutate(time = as.numeric(gsub("t", "", time))) %>% 
+# Summary stats for confidence ribbons
+ecg_stats <- ecg_long %>% 
   group_by(label_name, color_group, time) %>% 
   summarise(
     mean_amp = mean(amplitude, na.rm = TRUE),
@@ -158,132 +67,13 @@ stats_plot_data <- ecg_clean %>%
     .groups = "drop"
   )
 
-# Filtering data to focus only on Arrhythmias
-pathology_stats <- stats_plot_data %>% 
-  filter(label_name != "Normal")
-
-# Visualization
-ggplot(pathology_stats, aes(x = time)) +
-  # Class-specific variability (ribbon)
-  geom_ribbon(aes(ymin = mean_amp - sd_amp, ymax = mean_amp + sd_amp,
-                  fill = color_group), alpha = 0.15) +
-  
-  # Primary mean signal line
-  geom_line(aes(y = mean_amp, color = color_group), linewidth = 1) +
-  
-  facet_wrap(~ label_name, ncol = 1, scales = "free_y") +
-  
-  # Colot mapping
-  scale_color_manual(values = ecg_palette) +
-  scale_fill_manual(values = ecg_palette) +
-  labs(
-    title = "Statistical Class Morphology Analysys",
-    subtitle = "Aggregated mean waveforms with +/- 1 standard deviation confidence ribbons",
-    x = "Normalized Time Index (t)",
-    y = "Voltage Amplitude (mV)",
-    color = "Clinical Status",
-    fill = "Clinical Status"
-  ) +
-  
-  # Styling the plot
-  theme_minimal(base_size = 11) + 
-  theme(
-    legend.position = "none", # legend removed: redundant with facet title
-    strip.text = element_text(face = "bold", size = 12),
-    panel.grid.minor = element_blank(),
-    plot.title = element_text(face = "bold", size = 14)
-  )
-```
-
-```{r}
-#| fig-height: 12
-#| fig-width: 9
-#| warning: false
-
-# Preprocessing
-ecg_time_stats <- ecg_clean %>% 
-  mutate(sample_id = row_number()) %>% 
-  filter(label != 0) %>% 
-  pivot_longer(cols = starts_with("t"), names_to = "time", values_to = "amplitude") %>% 
-  mutate(time = as.numeric(str_remove(time, "t"))) %>% 
-  # Skip points with t < 10 - remove initial artefact
-  filter(time > 10) %>% 
-  # Find peak for each sample
-  group_by(sample_id, label_name, color_group) %>% 
-  summarise(
-    r_peak_time = time[which.max(amplitude)],
-    .groups = "drop"
-  )
-
-# Data visualization
-ggplot(ecg_time_stats, aes(x = label_name, y = r_peak_time)) +
-  # Violin plot 
-  geom_violin(fill = ecg_palette["Arrhythmia"], alpha = 0.3, color = NA, scale = "width", trim = FALSE) +
-  # Jitter
-  geom_jitter(color = ecg_palette["Arrhythmia"], alpha = 0.5, width = 0.2, size = 0.3) +
-  # Boxplot
-  geom_boxplot(width = 0.1, color = "#001111", alpha = 0.8, outlier.shape = NA) +
-  
-  coord_flip() +
-  labs(
-    title = "Temporal Instability of Pathological R-peaks",
-    subtitle = "Combined view of raw data (jitter), density (violin), and statistics (boxplot)",
-    x = "Arrhythmia Type",
-    y = "R-Peak Position (Sample Index [t])"
-  ) +
-  theme_minimal(base_size = 14) +
-  theme(
-    legend.position = "none",
-    panel.grid.minor = element_blank(),
-    plot.title = element_text(face = "bold", size = 10),
-    axis.text.y = element_text(face = "bold")
-  )
-```
-
-```{r}
-#| label: fig-technical-zones
-#| fig-width: 9
-#| fig-height: 5
-
-# Data prepossessing
-tech_baseline <- ecg_clean %>% 
+# Extract a single reference baseline (Normal)
+first_normal_id <- ecg_tidy %>% 
   filter(label == 0) %>% 
   slice(1) %>% 
-  # select only signal columns
-  select(starts_with("t")) %>% 
-  pivot_longer(everything(), names_to = "time", values_to = "amplitude") %>% 
-  mutate(time = as.numeric(gsub("t", "", time)))
+  pull(sample_id)
 
-# Define colors and alpha levels
-tech_settings <- data.frame(
-  type = c("Artifact", "QRS Complex", "Baseline"),
-  color = c("#4575b4", "#762a83", ecg_palette["Normal"]),
-  alpha = c(1, 1, 0.25)
-)
-
-tech_sample_plot <- tech_baseline  %>% 
-  mutate(type = case_when(
-    time <= 10 ~ "Artifact",
-    time >= 98 & time <= 110 ~ "QRS Complex",
-    TRUE ~ "Baseline"
-  ))
-
-ggplot(tech_sample_plot, aes(x = time, y = amplitude, group = 1)) +
-  # Normal ecg signal
-  geom_line(aes(color = type, alpha = type), linewidth = 1.1) +
-  # Manual parameter setting
-  scale_color_manual(values = setNames(tech_settings$color, tech_settings$type)) +
-  scale_alpha_manual(values = setNames(tech_settings$alpha, tech_settings$type)) +
-  labs(
-    title = "Signal anatomy",
-    subtitle = "Highlighting critical segments.",
-    x = "Time Index (t)",
-    y = "Voltage Amplitude"
-  ) +
-  theme_minimal(base_size = 12) +
-  theme(
-    legend.position = "bottom",
-    panel.grid.minor = element_blank(),
-    plot.title = element_text(face = "bold", size = 14)
-  )
+normal_baseline <- ecg_long %>% 
+  filter(sample_id == first_normal_id) %>%
+  select(time, baseline_amp = amplitude)
 ```
