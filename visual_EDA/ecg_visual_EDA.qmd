@@ -67,6 +67,10 @@ ecg_stats <- ecg_long %>%
     .groups = "drop"
   )
 
+# Summary stats only for arrhythmia classes
+arrhythmia_stats <- ecg_stats %>% 
+  filter(label_name != "Normal")
+
 # Extract a single reference baseline (Normal)
 first_normal_id <- ecg_tidy %>% 
   filter(label == 0) %>% 
@@ -111,5 +115,47 @@ ggplot(plot_data_rep, aes(x = time)) +
     y = "Voltage Amplitude (mV)",
     color = "Clinical Status"
   ) +
-  theme_minimal(base_size = 11)
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold", size = 14)
+  )
+```
+
+```{r}
+#| label: fig-statistical-analysis
+#| fig-height: 10
+#| fig-width: 8
+
+ggplot(pathology_stats, aes(x = time)) +
+  # Range of variability (ribbon)
+  geom_ribbon(aes(ymin = mean_amp - sd_amp,
+                  ymax = mean_amp + sd_amp,
+                  fill = color_group),
+              alpha = 0.15
+                  ) +
+  # Main line
+  geom_line(aes(y = mean_amp, color = color_group),
+            linewidth = 1) +
+  
+  facet_wrap(~ label_name, ncol = 1, scales= "free_y") +
+  scale_color_manual(values = ecg_palette) +
+  scale_fill_manual(values = ecg_palette) +
+    theme_minimal(base_size = 11) + 
+  labs(
+    title = "Statistical Class Morphology Analysys",
+    subtitle = "Aggregated mean waveforms with +/- 1 standard deviation confidence ribbons",
+    x = "Normalized Time Index (t)",
+    y = "Voltage Amplitude (mV)",
+    color = "Clinical Status",
+    fill = "Clinical Status"
+  ) +
+  
+  # Styling the plot
+  theme_minimal(base_size = 11) + 
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", size = 14)
+  )
+  
 ```
