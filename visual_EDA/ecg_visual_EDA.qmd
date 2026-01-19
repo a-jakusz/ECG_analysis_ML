@@ -76,4 +76,40 @@ first_normal_id <- ecg_tidy %>%
 normal_baseline <- ecg_long %>% 
   filter(sample_id == first_normal_id) %>%
   select(time, baseline_amp = amplitude)
+
+# Randomly select id for representative sample of each arrhythmia class
+selected_ids <- ecg_long %>% 
+  filter(label != 0) %>% 
+  distinct(sample_id, label_name) %>% 
+  group_by(label_name) %>% 
+  slice_sample(n = 1) %>% 
+  pull(sample_id)
+```
+
+```{r}
+#| label: fig-representative
+#| fig-height: 10
+#| fig-width: 8
+
+# Build data for plot
+plot_data_rep <- ecg_long %>% 
+  filter(sample_id %in% selected_ids) %>% 
+  left_join(normal_baseline, by = "time") %>% 
+  arrange(label_name, time)
+
+ggplot(plot_data_rep, aes(x = time)) +
+  # Background reference
+  geom_line(aes(y = baseline_amp, color = "Normal Reference", group = 1), linetype = "dashed") +
+  # Main signal
+  geom_line(aes(y = amplitude, color = color_group, group = 1), linewidth = 0.8) +
+  facet_wrap(~ label_name, ncol = 1, scales = "free_y") +
+  scale_color_manual(values = ecg_palette) +
+  labs(
+    title = "Individual Arrhythmia Heartbeat Samples",
+    subtitle = "Single-sample morphology comparison against a healthy reference",
+    x = "Normalized Time Index (t)",
+    y = "Voltage Amplitude (mV)",
+    color = "Clinical Status"
+  ) +
+  theme_minimal(base_size = 11)
 ```
