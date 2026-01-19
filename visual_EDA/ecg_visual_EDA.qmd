@@ -168,26 +168,33 @@ ggplot(pathology_stats, aes(x = time)) +
 tech_sample_plot <- normal_baseline  %>% 
   mutate(type = case_when(
     (time <= 10) | (time >= 98 & time <= 110) ~ "QRS Complex",
-    TRUE ~ "Baseline"
+    TRUE ~ "Normal ECG Signal"
   ))
 
 ggplot(tech_sample_plot, aes(x = time, y = baseline_amp, group = 1)) +
   # Normal ecg signal
   geom_line(aes(color = type, alpha = type), linewidth = 1.1) +
+  # Annotations for R-R interval
+  annotate("segment", x = 5, xend = 100, y = 0.75, yend = 0.75,
+           colour = "#4a4b4c", linewidth = 0.8,
+           arrow = arrow(length = unit(0.2, "cm"), ends = "both")) +
+  annotate("text", x = 50, y = 0.8, label = "R-R Interval", size = 3.5, color = "#4a4b4c") +
   # Manual parameter setting
   scale_color_manual(values = c(
     "QRS Complex" = unname(ecg_palette["QRS Complex"]),
-    "Baseline" = unname(ecg_palette["Normal"])
+    "Normal ECG Signal" = unname(ecg_palette["Normal"])
   )) +
   scale_alpha_manual(values = c(
     "QRS Complex" = 1,
-    "Baseline" = 0.3    
+    "Normal ECG Signal" = 0.3    
   )) +
   labs(
     title = "Signal anatomy",
     subtitle = "Highlighting QRS complexes",
-    x = "Time Index (t)",
-    y = "Voltage Amplitude"
+    x = "Normalized Time Index (t)",
+    y = "Voltage Amplitude",
+    color = "Segment Type:",
+    alpha = "Segment Type:"
   ) +
   theme_minimal(base_size = 12) +
   theme(
