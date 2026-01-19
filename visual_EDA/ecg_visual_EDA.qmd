@@ -159,3 +159,40 @@ ggplot(pathology_stats, aes(x = time)) +
   )
   
 ```
+
+```{r}
+#| label: fig-QRS
+#| fig-height: 5
+#| fig-width: 8
+
+tech_sample_plot <- normal_baseline  %>% 
+  mutate(type = case_when(
+    (time <= 10) | (time >= 98 & time <= 110) ~ "QRS Complex",
+    TRUE ~ "Baseline"
+  ))
+
+ggplot(tech_sample_plot, aes(x = time, y = baseline_amp, group = 1)) +
+  # Normal ecg signal
+  geom_line(aes(color = type, alpha = type), linewidth = 1.1) +
+  # Manual parameter setting
+  scale_color_manual(values = c(
+    "QRS Complex" = unname(ecg_palette["QRS Complex"]),
+    "Baseline" = unname(ecg_palette["Normal"])
+  )) +
+  scale_alpha_manual(values = c(
+    "QRS Complex" = 1,
+    "Baseline" = 0.3    
+  )) +
+  labs(
+    title = "Signal anatomy",
+    subtitle = "Highlighting QRS complexes",
+    x = "Time Index (t)",
+    y = "Voltage Amplitude"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold", size = 14)
+  )
+```
