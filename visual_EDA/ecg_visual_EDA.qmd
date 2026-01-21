@@ -1,0 +1,83 @@
+---
+title: "ecg_visual_EDA"
+format:
+  html:
+    code-fold: true
+    toc: true
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+
+library(tidyverse)
+
+# --- Initial setup ---
+# Define colors for further use to achieve consistency
+colors <- c(
+  "Normal"           = "#4a4b4c",
+  "Arrhythmia"       = "#d73027",
+  "Normal Reference" = "#b3b4b5"
+)
+
+# Set a seed to ensure that the 'random' selections are the same every time
+set.seed(20)
+```
+
+```{r}
+#| label: global-preprocessing
+#| message: false
+
+# --- Data Ingestion ---
+# Directly reading from the compressed ZIP archive
+zip_path <- "../data/mitbih_test.zip"
+ecg_raw <- read_csv(unz(zip_path, "mitbih_test.csv"), col_names = FALSE)
+
+# Assigning structured column names: 't1' through 't187' for temporal points, and 'label' for the cardiological classification
+colnames(ecg_raw) <- c(paste0("t", 1:(ncol(ecg_raw) - 1)), "label")
+
+# --- Labeling and Classification ---
+ecg_tidy <- ecg_raw %>% 
+  mutate(
+    sample_id = row_number(),
+    label_name = case_when(
+      label == 0 ~ "Normal",
+      label == 1 ~ "Supraventricular",
+      label == 2 ~ "Ventricular",
+      label == 3 ~ "Fusion",
+      label == 4 ~ "Unclassified"
+    ),
+    color_group = ifelse(label == 0, "Normal", "Arrhythmia")
+  ) 
+
+# --- Representative Sample Selection ---
+# Extracting individual prototypical beats for each class 
+selected_samples_long <- ecg_tidy %>% 
+  group_by(label_name) %>% 
+  slice_sample(n = 1) %>% 
+  ungroup() %>% 
+  pivot_longer(cols = starts_with("t"),names_to = "time", values_to = "amplitude") %>% 
+  mutate(time = as.numeric(str_remove(time, "t")))
+
+# --- Baseline Reference Extraction ---
+# Isolationg a single, representative 'Normal' heart beat to serve as a morphological baseline for comparative visualization
+normal_baseline <- selected_samples_long %>% 
+  filter(label_name == "Normal") %>% 
+  select(time, baseline_amp = amplitude)
+
+# --- Statistical Aggregation ---
+# Calculating mean and standard deviation per time points across all classes.
+# This serves as the foundation for statistical uncertainty ribbons
+ecg_stats <- ecg_tidy %>% 
+  pivot_longer(cols = starts_with("t"), names_to = "time", values_to = "amp") %>% 
+  mutate(time = as.numeric(str_remove(time, "t"))) %>% 
+  group_by(label_name, color_group, time) %>% 
+  summarise(
+    mean_amp = mean(amp, na.rm = TRUE),
+    sd_amp   = sd(amp, na.rm = TRUE),
+    .groups  = "drop"
+  )
+
+```
