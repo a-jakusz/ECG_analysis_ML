@@ -4,11 +4,27 @@ format:
   html:
     code-fold: true
     toc: true
-editor: visual
+    toc-depth: 2
+    toc-title: "Contents"
+    number-sections: true
+    code-fold: true
+    code-summary: "Show R code"
+    theme: 
+      light: cosmo
+      dark: darkly
+    embed-resources: true
+    fig-cap-location: bottom
+    tbl-cap-location: top
+    smooth-scroll: true
+crossref: 
+  fig-prefix: "Fig."
+  fig-title: "Figure"
+execute: 
+  echo: true
 ---
 
 ```{r}
-#| label: setup and global-preprocessing
+#| label: setup-and-global-preprocessing
 #| message: false
 #| warning: false
 
@@ -18,7 +34,7 @@ required_packages <- c("tidyverse", "patchwork")
 
 # Automatic installer for missing dependencies
 new_packages <- required_packages[!(required_packages %in% installed.packages()[,"Package"])]
-if(length(new_packages)) install.packages(new_package)
+if(length(new_packages)) install.packages(new_packages)
 
 library(tidyverse)
 library(patchwork)
@@ -36,8 +52,8 @@ set.seed(20)
 
 # --- Data Ingestion ---
 # Directly reading from the compressed ZIP archive
-zip_path <- "../data/mitbih_test.zip"
-ecg_raw <- read_csv(unz(zip_path, "mitbih_test.csv"), col_names = FALSE)
+zip_path <- "../data/mitbih_train.zip"
+ecg_raw <- read_csv(unz(zip_path, "mitbih_train.csv"), col_names = FALSE)
 
 # Assigning structured column names: 't1' through 't187' for temporal points, and 'label' for the cardiological classification
 colnames(ecg_raw) <- c(paste0("t", 1:(ncol(ecg_raw) - 1)), "label")
@@ -53,13 +69,15 @@ ecg_tidy <- ecg_raw %>%
       label == 3 ~ "Fusion",
       label == 4 ~ "Unclassified"
     ),
+    # Ordering factors to ensure 'Normal' is always the baseline in plots
+    label_name = factor(label_name, levels = c("Normal", "Supraventricular", "Ventricular", "Fusion", "Unclassified")), 
     color_group = ifelse(label == 0, "Normal", "Arrhythmia")
   ) 
 
 
 # Map colors to all existing labels in the dataset
 # This ensures any arrhythmia class automatically gets the "Arrhythmia" color
-all_detected_labels <- unique(ecg_tidy$label_name)
+all_detected_labels <- levels(ecg_tidy$label_name)
 
 full_colors <- setNames(
   ifelse(all_detected_labels == "Normal",
@@ -86,7 +104,8 @@ normal_baseline <- selected_samples_long %>%
 # --- Statistical Aggregation ---
 # Calculating mean and standard deviation per time points across all classes.
 # This serves as the foundation for statistical uncertainty ribbons
-ecg_stats <- ecg_tidy %>% 
+ecg_stats <- ecg_tidy %>%
+  slice_sample(prop = 0.2) %>% 
   pivot_longer(cols = starts_with("t"), names_to = "time", values_to = "amp") %>% 
   mutate(time = as.numeric(str_remove(time, "t"))) %>% 
   group_by(label_name, color_group, time) %>% 
@@ -95,26 +114,15 @@ ecg_stats <- ecg_tidy %>%
     sd_amp   = sd(amp, na.rm = TRUE),
     .groups  = "drop"
   )
-
-# --- ACF preprocessing ---
-acf_results <- selected_samples_long %>% 
-  group_by(label_name) %>% 
-  summarise(
-    # Calculate correlation for lags from 0 to 50
-    acf_values = list(as.numeric(acf(amplitude, lag.max = 50, plot = FALSE)$acf)),
-    lag = list(0:50),
-    .groups = "drop"
-  ) %>% 
-  unnest(cols = c(acf_values, lag))
 ```
 
 ```{r}
-#| label: fig-representative
+#| label: fig-representative-dashboard
 #| fig-height: 10
 #| fig-width: 16
 #| message: false
 
-# --- Local Preprocessing ---
+# --- Local Preprocessing - comparative analysis ---
 # Join with baseline and ensure factor levels
 plot_data_rep <- selected_samples_long %>% 
   filter(label_name != "Normal") %>% 
@@ -122,12 +130,12 @@ plot_data_rep <- selected_samples_long %>%
   mutate(label_name = factor(label_name,
                              levels = c("Supraventricular", "Ventricular", "Fusion", "Unclassified")))
 
-# --- Plotting ---
+# --- Plotting - comparative analysis---
 p_morphology <- ggplot(plot_data_rep, aes(x = time)) +
   # Background reference
   geom_line(aes(y = baseline_amp, color = "Normal Reference"), linetype = "dashed", linewidth = 0.5) +
   # Main signal
-  geom_line(aes(y = amplitude, color = color_group),
+  geom_line(aes(y = amplitude, color = "Arrhythmia"),
             linewidth = 0.8) +
   
   facet_wrap(~label_name, ncol = 1, scales = "free_y") +
@@ -151,7 +159,7 @@ p_morphology <- ggplot(plot_data_rep, aes(x = time)) +
     panel.spacing = unit(1, "lines")
   )
 
-# --- Local Preprocessing 2 ---
+# --- Local Preprocessing - bar plots ---
 pathology_dist <- ecg_tidy %>%
   # Exclude 'Normal' class to avoid it dominating others
   filter(label_name != "Normal") %>% 
@@ -160,15 +168,15 @@ pathology_dist <- ecg_tidy %>%
   mutate(label_name = factor(label_name, 
                              levels = c("Supraventricular", "Ventricular", "Fusion", "Unclassified")))
 
-# --- Plotting 2---
+# --- Plotting - bar plots ---
 p_dist <- ggplot(pathology_dist, aes(x = label_name, y = n, fill = label_name)) +
   geom_col(fill = colors["Arrhythmia"], alpha = 0.8, width = 0.6) +
-  geom_text(aes(label = paste0("n = ", n, "\n", round(percent_of_pathologies, 1), "% of anomalies")), vjust = -0.5, size = 4, fontface = "bold") +
+  geom_text(aes(label = paste0(round(percent_of_pathologies, 1), "%\nof anomalies")), vjust = -0.5, size = 4, fontface = "bold") +
   # Add 15% padding at the top to ensure labels don't get clipped
   scale_y_continuous(expand = expansion(mult = c(0, 0.15)))+
   labs(
     title = "Detailed Distribution of Arrhythmia Classes",
-    subtitle = "Analysis of apthological samples only to highlight minority class imbalances",
+    subtitle = "Analysis of pathological samples only to highlight minority class imbalances",
     x = "Arrhythmia Type",
     y = "Count",
     fill = "Type"
@@ -190,19 +198,25 @@ p_morphology + p_dist + plot_layout(widths = c(2, 1)) +
 ```
 
 ```{r}
-#| label: fig-ribbon-plots
+#| label: fig-analysis-of-variability-among-each-arrhythmia-class
 #| fig-height: 10
 #| fig-width: 8
+
+# --- Local Preprocessing ---
+pathology_stats <- ecg_stats %>% 
+  filter(label_name != "Normal") %>% 
+  mutate(label_name = factor(label_name,
+                             levels = c("Supraventricular", "Ventricular", "Fusion", "Unclassified")))
 
 # --- Plotting ---
 ggplot(pathology_stats, aes(x = time)) +
   # Range of variability (ribbon)
   geom_ribbon(aes(ymin = mean_amp - sd_amp,
                   ymax = mean_amp + sd_amp,
-                  fill = color_group),
+                  fill = "Arrhythmia"),
               alpha = 0.15) +
   # Main line
-  geom_line(aes(y = mean_amp, color = color_group),
+  geom_line(aes(y = mean_amp, color = "Arrhythmia"),
             linewidth = 1) +
   
   facet_wrap(~ label_name, ncol = 1, scales = "free_y") +
@@ -210,7 +224,7 @@ ggplot(pathology_stats, aes(x = time)) +
   
   labs(
     title = "Analysis of Variability Among Each Arrhythmia Class",
-    subtitle = "Aggreagated mean waveforms with +/-1 standard deviation confidence ribbons",
+    subtitle = "Aggregated mean waveforms with +/-1 standard deviation confidence ribbons",
     x = "Time Index (t)",
     y = "Amplitude (mV)",
     color = "Clinical Status"
@@ -228,11 +242,22 @@ ggplot(pathology_stats, aes(x = time)) +
 ```
 
 ```{r}
-#| label: fig-acf-final-dashboard
+#| label: fig-acf
 #| fig-width: 14
 #| fig-height: 6
 #| message: false
 #| warning: false
+
+# --- Local Preprocessing ---
+acf_results <- selected_samples_long %>% 
+  group_by(label_name) %>% 
+  summarise(
+    # Calculate correlation for lags from 0 to 50
+    acf_values = list(as.numeric(acf(amplitude, lag.max = 50, plot = FALSE)$acf)),
+    lag = list(0:50),
+    .groups = "drop"
+  ) %>% 
+  unnest(cols = c(acf_values, lag))
 
 # Plot on the left - Normal Rhythm
 p_left <- acf_results %>% 
@@ -241,7 +266,7 @@ p_left <- acf_results %>%
   geom_col(fill = full_colors["Normal"], width = 0.7) +
   labs(
     title = "Normal Rhythm",
-    subtitle = "Standard temporaly decay signature",
+    subtitle = "Standard temporal decay signature",
     x = "Lag (Time steps)",
     y = "Autocorrelation"
   ) +
@@ -263,7 +288,7 @@ p_right <- acf_results %>%
   scale_fill_manual(values = full_colors) +
   labs(
     title = "Arrhythmia classes",
-    subtitle = "Rhytmic deviations in arrhythmia classes",
+    subtitle = "Rhythmic deviations in arrhythmia classes",
     x = "Lag (Time steps)",
     y = NULL
   ) +
