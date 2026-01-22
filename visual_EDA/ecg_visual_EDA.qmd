@@ -31,17 +31,6 @@ colors <- c(
   "Normal Reference" = "#b3b4b5"
 )
 
-# Map colors to all existing labels in the dataset
-# This ensures any arrhythmia class automatically gets the "Arrhythmia" color
-all_detected_labels <- unique(acf_results$label_name)
-
-full_colors <- setNames(
-  ifelse(all_detected_labels == "Normal",
-         colors["Normal"],
-         colors["Arrhythmia"]),
-  all_detected_labels
-  )
-
 # Set a seed to ensure that the 'random' selections are the same every time
 set.seed(20)
 
@@ -66,6 +55,18 @@ ecg_tidy <- ecg_raw %>%
     ),
     color_group = ifelse(label == 0, "Normal", "Arrhythmia")
   ) 
+
+
+# Map colors to all existing labels in the dataset
+# This ensures any arrhythmia class automatically gets the "Arrhythmia" color
+all_detected_labels <- unique(ecg_tidy$label_name)
+
+full_colors <- setNames(
+  ifelse(all_detected_labels == "Normal",
+         colors["Normal"],
+         colors["Arrhythmia"]),
+  all_detected_labels
+  )
 
 # --- Representative Sample Selection ---
 # Extracting individual prototypical beats for each class 
@@ -95,6 +96,16 @@ ecg_stats <- ecg_tidy %>%
     .groups  = "drop"
   )
 
+# --- ACF preprocessing ---
+acf_results <- selected_samples_long %>% 
+  group_by(label_name) %>% 
+  summarise(
+    # Calculate correlation for lags from 0 to 50
+    acf_values = list(as.numeric(acf(amplitude, lag.max = 50, plot = FALSE)$acf)),
+    lag = list(0:50),
+    .groups = "drop"
+  ) %>% 
+  unnest(cols = c(acf_values, lag))
 ```
 
 ```{r}
@@ -216,7 +227,6 @@ ggplot(pathology_stats, aes(x = time)) +
   )
 ```
 
-
 ```{r}
 #| label: fig-acf-final-dashboard
 #| fig-width: 14
@@ -271,4 +281,99 @@ p_right <- acf_results %>%
 p_left + p_right + plot_layout(widths = c(1, 1.8))
 ```
 
+```{r}
+#| label: fix-boxplot-rms
+#| fig-width: 8
+#| fig-height: 10
+#| message: false
+#| warning: false
 
+# --- Local Preprocessing ---
+# Calculate RMS deviation
+rms_deviation <- ecg_tidy %>% 
+  pivot_longer(
+    cols = starts_with("t"),
+    names_to = "time",
+    values_to = "amp"
+  ) %>% 
+  mutate(time = as.numeric(str_remove(time, "t"))) %>% 
+  left_join(
+    ecg_stats %>% select(label_name, time, mean_amp),
+    by = c("label_name", "time")
+  ) %>% 
+  mutate(dev = amp - mean_amp) %>% 
+  group_by(sample_id, label_name) %>% 
+  summarise(
+    rms_dev = sqrt(mean(dev^2, na.rm = TRUE)),
+    .groups = "drop"
+  )
+
+# Compute Y limits
+y_min <- floor(min(rms_deviation$rms_dev, na.rm = TRUE) * 10) / 10
+y_max <- ceiling(max(rms_deviation$rms_dev, na.rm = TRUE) * 10) / 10
+
+# --- Plotting ---
+# Left plot
+p_normal <- rms_deviation %>% 
+  filter(label_name == "Normal") %>% 
+  ggplot(aes(x = "", y = rms_dev)) +
+  geom_violin(fill = colors["Normal"], alpha = 0.7) +
+  geom_boxplot(width = 0.18, outlier.shape = NA, alpha = 0.9) +
+  labs(
+    title = "Normal Rhythm",
+    x = NULL,
+    y = "RMS Deviation (mV)"
+  ) + 
+  coord_cartesian(ylim = c(y_min, y_max)) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    plot.title = element_text(face = "bold", size = 14),
+    panel.grid.minor = element_blank()
+  )
+
+# Right plot
+p_arrhythmia <- rms_deviation %>% 
+  filter(label_name != "Normal") %>% 
+  mutate(
+    label_name = factor(
+      label_name,
+      levels = c("Supraventricular", "Ventricular", "Fusion", "Unclassified")
+    )
+  ) %>% 
+  ggplot(aes(x = "", y = rms_dev, fill = label_name)) +
+  geom_violin(alpha = 0.7) +
+  geom_boxplot(width = 0.18, outlier.shape = NA, alpha = 0.9) +
+  facet_wrap(~ label_name, ncol = 2) +
+  scale_fill_manual(values = full_colors) +
+  labs(
+    title = "Arrhythmia Classes",
+    x = NULL,
+    y = NULL,
+  ) +
+  # Ensure each plot has the same y scale
+  coord_cartesian(ylim= c(y_min, y_max)) + 
+  theme_minimal(base_size = 11) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "none",
+    plot.title = element_text(face = "bold", size = 14),
+    strip.background = element_rect(fill = "grey95", color = NA),
+    strip.text = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+
+# Patchwork layout
+p_normal + p_arrhythmia + 
+  plot_layout(widths = c(1, 2)) +
+  plot_annotation(
+    title = "Within-Class ECG Morphology Variability",
+    subtitle = "RMS deviation from class-mean waveform",
+    theme = theme(
+      plot.title = element_text(face = "bold", size = 18),
+      plot.subtitle = element_text(size = 12)
+    )
+  )
+```
