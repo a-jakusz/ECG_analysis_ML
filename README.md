@@ -75,6 +75,8 @@ Deep learning models, especially 1D convolutional networks, are well suited for 
 - Fully connected layers with dropout
 - Output layer with 5 logits (one per class)
 
+![Model architecture scheme](1.png)
+
 ### Training Details
 - Loss function: Cross-Entropy Loss with class weights
 - Optimizer: Adam
