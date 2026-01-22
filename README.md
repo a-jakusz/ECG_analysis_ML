@@ -113,7 +113,7 @@ The comparison with baseline models clearly shows the benefit of modeling tempor
 
 ## References
 
-ECG and dataset
+    1) ECG and dataset
 
 Goldberger et al., 2000
 PhysioBank, PhysioToolkit, and PhysioNet: Components of a New Research Resource for Complex Physiologic Signals - original MIT-BIH Arrhythmia Database
