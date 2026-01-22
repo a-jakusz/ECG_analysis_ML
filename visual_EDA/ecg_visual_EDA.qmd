@@ -417,16 +417,16 @@ rcs_plot
 # Export Plots
 
 ```{r}
-ggsave("Fig_1_2_Morphology.pdf",
+ggsave("Fig_1_2_Morphology.png",
        plot = p_repr, width = 16, height = 10)
 
-ggsave("Fig_3_Variability.pdf",
+ggsave("Fig_3_Variability.png",
        plot = rib_plot, width = 10, height = 8)
 
-ggsave("Fig_4_5_ACF.pdf",
+ggsave("Fig_4_5_ACF.png",
        plot = acf_plots, width = 14, height = 6)
 
-ggsave("Fig_6_RMS_Comparison.pdf",
+ggsave("Fig_6_RMS_Comparison.png",
        plot = rcs_plot, width = 8, height = 10)
 
 ```
