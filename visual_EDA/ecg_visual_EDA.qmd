@@ -150,6 +150,7 @@ p_morphology <- ggplot(plot_data_rep, aes(x = time)) +
     x = "Time Index (t)",
     y = "Amplitude (mV)",
     color = "Clinical Category",
+    caption = "(Fig. 1) The complex shapes and temporal shifts in pathological beats suggest that classical ML methods could be insufficient."
   ) +
   # Styling the plot
   theme_minimal(base_size = 11) + 
@@ -159,7 +160,8 @@ p_morphology <- ggplot(plot_data_rep, aes(x = time)) +
     strip.background = element_rect(fill = "grey95", color = NA),
     strip.text = element_text(face = "bold"),
     panel.grid.minor = element_blank(),
-    panel.spacing = unit(1, "lines")
+    panel.spacing = unit(1, "lines"),
+    plot.caption = element_text(size = 10, hjust = 0, face = "italic", margin = margin(t = 10))
   )
 
 # --- Local Preprocessing - bar plots ---
@@ -182,22 +184,26 @@ p_dist <- ggplot(pathology_dist, aes(x = label_name, y = n, fill = label_name)) 
     subtitle = "Analysis of pathological samples only to highlight minority class imbalances",
     x = "Arrhythmia Type",
     y = "Count",
-    fill = "Type"
+    fill = "Type",
+    caption = "(Fig. 2) Significant class imbalance could be a major challenge for model training, \nas it may lead to biased predictions."
   ) +
   theme_minimal() +
   theme(
     legend.position = "none",
     plot.title = element_text(face = "bold", size = 16),
     panel.grid.minor = element_blank(),
-    panel.spacing = unit(1, "lines")
+    panel.spacing = unit(1, "lines"),
+    plot.caption = element_text(size = 10, hjust = 0, face = "italic", margin = margin(t = 10))
   )
 
-p_morphology + p_dist + plot_layout(widths = c(2, 1)) +
+p_repr <- (p_morphology + p_dist + plot_layout(widths = c(2, 1)) +
   plot_annotation(
     title = "Clinical Profile of Arrhythmia Classes",
     subtitle = "Integration of signal morphology and dataset prevalence",
     theme = theme(plot.title = element_text(face = "bold", size = 18))
-  )
+  ))
+
+p_repr
 ```
 
 # Analysis of Variability Among Each Arrhythmia Class
@@ -214,7 +220,7 @@ pathology_stats <- ecg_stats %>%
                              levels = c("Supraventricular", "Ventricular", "Fusion", "Unclassified")))
 
 # --- Plotting ---
-ggplot(pathology_stats, aes(x = time)) +
+rib_plot <- ggplot(pathology_stats, aes(x = time)) +
   # Range of variability (ribbon)
   geom_ribbon(aes(ymin = mean_amp - sd_amp,
                   ymax = mean_amp + sd_amp,
@@ -232,7 +238,8 @@ ggplot(pathology_stats, aes(x = time)) +
     subtitle = "Aggregated mean waveforms with +/-1 standard deviation variability",
     x = "Time Index (t)",
     y = "Amplitude (mV)",
-    color = "Clinical Status"
+    color = "Clinical Status",
+    caption = "(Fig. 3) High variability wiithin ceratin classes suggests significant morphology overlap, which may make it difficult for \nany model to distinguish between them."
   ) +
   # Styling the plot
   theme_minimal(base_size = 11) + 
@@ -242,8 +249,11 @@ ggplot(pathology_stats, aes(x = time)) +
     strip.background = element_rect(fill = "grey95", color = NA),
     strip.text = element_text(face = "bold"),
     panel.grid.minor = element_blank(),
-    panel.spacing = unit(1, "lines")
+    panel.spacing = unit(1, "lines"),
+    plot.caption = element_text(size = 10, hjust = 0, face = "italic", margin = margin(t = 10))
   )
+
+rib_plot
 ```
 
 # Signal Autocorrelation
@@ -275,7 +285,8 @@ p_left <- acf_results %>%
     title = "Normal Beat Autocorrelation",
     subtitle = "Standard temporal decay signature",
     x = "Lag (Time steps)",
-    y = "Autocorrelation"
+    y = "Autocorrelation",
+    caption = "(Fig. 4) The Normal class has a specific temporal signature, showing \nhow the signal's rhythm changes quickly over time."
   ) +
   theme_minimal(base_size = 11) +
   theme(
@@ -283,7 +294,8 @@ p_left <- acf_results %>%
     plot.title = element_text(face = "bold", size = 16),
     strip.text = element_text(face = "bold"),
     panel.grid.minor = element_blank(),
-    panel.spacing = unit(1, "lines")
+    panel.spacing = unit(1, "lines"),
+    plot.caption = element_text(size = 10, hjust = 0, face = "italic", margin = margin(t = 10))
   )
 
 # Plot on the right - Arrhythmias
@@ -297,7 +309,8 @@ p_right <- acf_results %>%
     title = "Arrhythmia classes",
     subtitle = "Temporal structure differences across arrhythmia",
     x = "Lag (Time steps)",
-    y = NULL
+    y = NULL,
+    caption = "(Fig. 5) Each arrhythmia class has a different autocorrelation shape. These unique rhythms are hard for simple models to understand."
   ) +
   # Styling the plot
   theme_minimal(base_size = 11) + 
@@ -307,10 +320,12 @@ p_right <- acf_results %>%
     strip.background = element_rect(fill = "grey95", color = NA),
     strip.text = element_text(face = "bold"),
     panel.grid.minor = element_blank(),
-    panel.spacing = unit(1, "lines")
+    panel.spacing = unit(1, "lines"),
+    plot.caption = element_text(size = 10, hjust = 0, face = "italic", margin = margin(t = 10))
   )
 
-p_left + p_right + plot_layout(widths = c(1, 1.8))
+acf_plots <- (p_left + p_right + plot_layout(widths = c(1, 1.8)))
+acf_plots
 ```
 
 # RMS Deviation Analysis
@@ -384,7 +399,7 @@ p_arrhythmia <- rms_deviation %>%
   labs(
     title = "Arrhythmia Classes",
     x = NULL,
-    y = NULL,
+    y = NULL
   ) +
   # Ensure each plot has the same y scale
   coord_cartesian(ylim= c(y_min, y_max)) + 
@@ -400,14 +415,35 @@ p_arrhythmia <- rms_deviation %>%
   )
 
 # Patchwork layout
-p_normal + p_arrhythmia + 
+rcs_plot <- (p_normal + p_arrhythmia + 
   plot_layout(widths = c(1, 2)) +
   plot_annotation(
     title = "Within-Class ECG Morphology Variability",
     subtitle = "RMS deviation from class-mean waveform",
+    caption = "(Fig 6.) The contrast between the stable Normal class (left) and high variability of arrhythmias (right) suggests that \nBatch Normalization is needed to keep the model stable.",
     theme = theme(
       plot.title = element_text(face = "bold", size = 18),
-      plot.subtitle = element_text(size = 12)
-    )
+      plot.subtitle = element_text(size = 12),
+    plot.caption = element_text(size = 10, hjust = 0, face = "italic", margin = margin(t = 10))
   )
+))
+
+rcs_plot
+```
+
+# Export Plots
+
+```{r}
+ggsave("Fig_1_2_Morphology.pdf",
+       plot = p_repr, width = 16, height = 10)
+
+ggsave("Fig_3_Variability.pdf",
+       plot = rib_plot, width = 10, height = 8)
+
+ggsave("Fig_4_5_ACF.pdf",
+       plot = acf_plots, width = 14, height = 6)
+
+ggsave("Fig_6_RMS_Comparison.pdf",
+       plot = rcs_plot, width = 8, height = 10)
+
 ```
