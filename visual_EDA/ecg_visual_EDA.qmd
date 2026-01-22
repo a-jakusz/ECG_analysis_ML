@@ -12,7 +12,16 @@ editor: visual
 #| message: false
 #| warning: false
 
+# ---Package Instalation ---
+# List of required packages
+required_packages <- c("tidyverse", "patchwork")
+
+# Automatic installer for missing dependencies
+new_packages <- required_packages[!(required_packages %in% installed.packages()[,"Package"])]
+if(length(new_packages)) install.packages(new_package)
+
 library(tidyverse)
+library(patchwork)
 
 # --- Initial setup ---
 # Define colors for further use to achieve consistency
@@ -21,6 +30,17 @@ colors <- c(
   "Arrhythmia"       = "#d73027",
   "Normal Reference" = "#b3b4b5"
 )
+
+# Map colors to all existing labels in the dataset
+# This ensures any arrhythmia class automatically gets the "Arrhythmia" color
+all_detected_labels <- unique(acf_results$label_name)
+
+full_colors <- setNames(
+  ifelse(all_detected_labels == "Normal",
+         colors["Normal"],
+         colors["Arrhythmia"]),
+  all_detected_labels
+  )
 
 # Set a seed to ensure that the 'random' selections are the same every time
 set.seed(20)
@@ -193,4 +213,58 @@ ggplot(pathology_dist, aes(x = label_name, y = n, fill = label_name)) +
     panel.grid.minor = element_blank(),
     panel.spacing = unit(1, "lines")
   )
+```
+
+```{r}
+#| label: fig-acf-final-dashboard
+#| fig-width: 14
+#| fig-height: 6
+#| message: false
+#| warning: false
+
+# Plot on the left - Normal Rhythm
+p_left <- acf_results %>% 
+  filter(label_name == "Normal") %>% 
+  ggplot(aes(x = lag, y = acf_values)) +
+  geom_col(fill = full_colors["Normal"], width = 0.7) +
+  labs(
+    title = "Normal Rhythm",
+    subtitle = "Standard temporaly decay signature",
+    x = "Lag (Time steps)",
+    y = "Autocorrelation"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", size = 16),
+    strip.text = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    panel.spacing = unit(1, "lines")
+  )
+
+# Plot on the right - Arrhythmias
+p_right <- acf_results %>% 
+  filter(label_name != "Normal") %>% 
+  ggplot(aes(x = lag, y = acf_values, fill = label_name)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~label_name, ncol = 2) +
+  scale_fill_manual(values = full_colors) +
+  labs(
+    title = "Arrhythmia classes",
+    subtitle = "Rhytmic deviations in arrhythmia classes",
+    x = "Lag (Time steps)",
+    y = NULL
+  ) +
+  # Styling the plot
+  theme_minimal(base_size = 11) + 
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", size = 16),
+    strip.background = element_rect(fill = "grey95", color = NA),
+    strip.text = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    panel.spacing = unit(1, "lines")
+  )
+
+p_left + p_right + plot_layout(widths = c(1, 1.8))
 ```
