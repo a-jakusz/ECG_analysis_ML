@@ -1,23 +1,6 @@
 ---
 title: "ecg_visual_EDA"
-format:
-  html:
-    code-fold: true
-    toc: true
-    toc-depth: 1
-    toc-title: "Contents"
-    number-sections: true
-    code-summary: "Show R code"
-    theme: 
-      light: cosmo
-      dark: darkly
-    embed-resources: true
-    fig-cap-location: bottom
-    tbl-cap-location: top
-    smooth-scroll: true
-crossref: 
-  fig-prefix: "Fig."
-  fig-title: "Figure"
+format: html
 execute: 
   echo: true
 ---
