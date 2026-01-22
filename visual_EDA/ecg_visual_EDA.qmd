@@ -4,10 +4,9 @@ format:
   html:
     code-fold: true
     toc: true
-    toc-depth: 2
+    toc-depth: 1
     toc-title: "Contents"
     number-sections: true
-    code-fold: true
     code-summary: "Show R code"
     theme: 
       light: cosmo
@@ -22,6 +21,8 @@ crossref:
 execute: 
   echo: true
 ---
+
+# Setup and Global Preprocessing
 
 ```{r}
 #| label: setup-and-global-preprocessing
@@ -87,7 +88,7 @@ full_colors <- setNames(
   )
 
 # --- Representative Sample Selection ---
-# Extracting individual prototypical beats for each class 
+# Extracting individual exemplar beats for each class 
 selected_samples_long <- ecg_tidy %>% 
   group_by(label_name) %>% 
   slice_sample(n = 1) %>% 
@@ -115,6 +116,8 @@ ecg_stats <- ecg_tidy %>%
     .groups  = "drop"
   )
 ```
+
+# Dataset Representative Dashboard
 
 ```{r}
 #| label: fig-representative-dashboard
@@ -197,6 +200,8 @@ p_morphology + p_dist + plot_layout(widths = c(2, 1)) +
   )
 ```
 
+# Analysis of Variability Among Each Arrhythmia Class
+
 ```{r}
 #| label: fig-analysis-of-variability-among-each-arrhythmia-class
 #| fig-height: 10
@@ -224,7 +229,7 @@ ggplot(pathology_stats, aes(x = time)) +
   
   labs(
     title = "Analysis of Variability Among Each Arrhythmia Class",
-    subtitle = "Aggregated mean waveforms with +/-1 standard deviation confidence ribbons",
+    subtitle = "Aggregated mean waveforms with +/-1 standard deviation variability",
     x = "Time Index (t)",
     y = "Amplitude (mV)",
     color = "Clinical Status"
@@ -240,6 +245,8 @@ ggplot(pathology_stats, aes(x = time)) +
     panel.spacing = unit(1, "lines")
   )
 ```
+
+# Signal Autocorrelation
 
 ```{r}
 #| label: fig-acf
@@ -265,7 +272,7 @@ p_left <- acf_results %>%
   ggplot(aes(x = lag, y = acf_values)) +
   geom_col(fill = full_colors["Normal"], width = 0.7) +
   labs(
-    title = "Normal Rhythm",
+    title = "Normal Beat Autocorrelation",
     subtitle = "Standard temporal decay signature",
     x = "Lag (Time steps)",
     y = "Autocorrelation"
@@ -288,7 +295,7 @@ p_right <- acf_results %>%
   scale_fill_manual(values = full_colors) +
   labs(
     title = "Arrhythmia classes",
-    subtitle = "Rhythmic deviations in arrhythmia classes",
+    subtitle = "Temporal structure differences across arrhythmia",
     x = "Lag (Time steps)",
     y = NULL
   ) +
@@ -305,6 +312,8 @@ p_right <- acf_results %>%
 
 p_left + p_right + plot_layout(widths = c(1, 1.8))
 ```
+
+# RMS Deviation Analysis
 
 ```{r}
 #| label: fix-boxplot-rms
