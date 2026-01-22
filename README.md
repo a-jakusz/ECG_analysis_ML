@@ -24,14 +24,14 @@ Visual inspection of the ECG plots (**Fig. 1**) reveals characteristic shapes of
 
 In turn, distribution analysis (**Fig. 2**) highlights the internal imbalance among pathological samples. Minority classes like Supraventricular and Fusion are significantly underrepresented. This confirms that accuracy is an unreliable metric. We must prioritize the macro-F1 score and use weighted cross-entropy to ensure the model does not ignore these rare but critical cases.
 
-![Dataset Representative Dashboard](../visual_EDA/Fig_1_2_Morphology.png)
+![Dataset Representative Dashboard](visual_EDA/Fig_1_2_Morphology.png)
 
 ### Analysis of Variability 
 To ensure model generalization, we must assess how much each class varies internally. High internal variance often leads to feature overlap and training instability. **Fig 3** presents the statistical consistency of each arrhythmia. 
 
 The shaded ribbons highlight significant intra-class variability. In turn, these fluctuations - especially in the Ventricular and Unclassified types - are responsible for potential instability in simpler architectures. Batch Normalization in the 1D-CNN could help to mitigate this instability by normalizing within each mini-batch, allowing the model to learn more reliably despite variability in the signals. 
 
-![Analysis of Variability Among Each Arrhythmia Class](../visual_EDA/Fig_3_Variability.png)
+![Analysis of Variability Among Each Arrhythmia Class](visual_EDA/Fig_3_Variability.png)
 
 ### Autocorrelation Analysis (ACF) 
 We use autocorrelation to check how a signal relates to itself over time. This helps us see the rhythm of each heartbeat. As shown in **Fig. 4** and **Fig. 5**, different classes have different temporal structures.  
@@ -40,14 +40,14 @@ The *Normal* beat has a specific signature that drops quickly. On the other hand
 
 Some classes stay correlated much longer than others. These unique time-based shapes are responsible for why simple models may fail, as they do not understand these long-term relationships in the signal.  
 
-![Signal Autocorrelation](../visual_EDA/Fig_4_5_ACF.png)
+![Signal Autocorrelation](visual_EDA/Fig_4_5_ACF.png)
 
 ### RMS Deviation Analysis 
 To better understand the stability of our data, we need to measure the distance between individual signals and their group average. The RMS deviation reflects this variability, showing how much heartbeats differ from the typical pattern of their class.  
 
 **Fig. 6** shows that the *Normal* rhythm and *Fusion* have lower average deviation. On the other hand, *Ventricular* and *Unclassified* show much higher RMS values and wider distributions (violin shapes). These high deviations are responsible for making the training difficult and suggest using models based on neural networks. If so, it probably won't work without Batch Normalization, which helps the model stay stable even when the signals are very different.  
 
-![RMS Deviation Analysis](../visual_EDA/Fig_6_RMS_Comparison.png)
+![RMS Deviation Analysis](visual_EDA/Fig_6_RMS_Comparison.png)
 
 ### Conclusion of EDA 
 The analysis shows that the dataset is complex because of its strong temporal rhythms and high internal noise. These factors are responsible for making the classification task difficult. These findings suggest that a robust approach like Deep Learning might be necessary, as simple models struggle with such diverse time-series data. 
