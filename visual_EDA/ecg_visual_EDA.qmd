@@ -99,8 +99,8 @@ ecg_stats <- ecg_tidy %>%
 
 ```{r}
 #| label: fig-representative
-#| fig-height: 12
-#| fig-width: 9
+#| fig-height: 10
+#| fig-width: 16
 #| message: false
 
 # --- Local Preprocessing ---
@@ -112,7 +112,7 @@ plot_data_rep <- selected_samples_long %>%
                              levels = c("Supraventricular", "Ventricular", "Fusion", "Unclassified")))
 
 # --- Plotting ---
-ggplot(plot_data_rep, aes(x = time)) +
+p_morphology <- ggplot(plot_data_rep, aes(x = time)) +
   # Background reference
   geom_line(aes(y = baseline_amp, color = "Normal Reference"), linetype = "dashed", linewidth = 0.5) +
   # Main signal
@@ -138,6 +138,43 @@ ggplot(plot_data_rep, aes(x = time)) +
     strip.text = element_text(face = "bold"),
     panel.grid.minor = element_blank(),
     panel.spacing = unit(1, "lines")
+  )
+
+# --- Local Preprocessing 2 ---
+pathology_dist <- ecg_tidy %>%
+  # Exclude 'Normal' class to avoid it dominating others
+  filter(label_name != "Normal") %>% 
+  count(label_name, color_group) %>% 
+  mutate(percent_of_pathologies = n / sum(n) * 100) %>% 
+  mutate(label_name = factor(label_name, 
+                             levels = c("Supraventricular", "Ventricular", "Fusion", "Unclassified")))
+
+# --- Plotting 2---
+p_dist <- ggplot(pathology_dist, aes(x = label_name, y = n, fill = label_name)) +
+  geom_col(fill = colors["Arrhythmia"], alpha = 0.8, width = 0.6) +
+  geom_text(aes(label = paste0("n = ", n, "\n", round(percent_of_pathologies, 1), "% of anomalies")), vjust = -0.5, size = 4, fontface = "bold") +
+  # Add 15% padding at the top to ensure labels don't get clipped
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15)))+
+  labs(
+    title = "Detailed Distribution of Arrhythmia Classes",
+    subtitle = "Analysis of apthological samples only to highlight minority class imbalances",
+    x = "Arrhythmia Type",
+    y = "Count",
+    fill = "Type"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", size = 16),
+    panel.grid.minor = element_blank(),
+    panel.spacing = unit(1, "lines")
+  )
+
+p_morphology + p_dist + plot_layout(widths = c(2, 1)) +
+  plot_annotation(
+    title = "Clinical Profile of Arrhythmia Classes",
+    subtitle = "Integration of signal morphology and dataset prevalence",
+    theme = theme(plot.title = element_text(face = "bold", size = 18))
   )
 ```
 
@@ -179,41 +216,6 @@ ggplot(pathology_stats, aes(x = time)) +
   )
 ```
 
-```{r}
-#| label: fig-class-distribution
-#| fig-height: 8
-#| fig-width: 6
-
-# --- Local Preprocessing ---
-pathology_dist <- ecg_tidy %>%
-  # Exclude 'Normal' class to avoid it dominating others
-  filter(label_name != "Normal") %>% 
-  count(label_name, color_group) %>% 
-  mutate(percent_of_pathologies = n / sum(n) * 100) %>% 
-  mutate(label_name = factor(label_name, 
-                             levels = c("Supraventricular", "Ventricular", "Fusion", "Unclassified")))
-
-# --- Plotting ---
-ggplot(pathology_dist, aes(x = label_name, y = n, fill = label_name)) +
-  geom_col(fill = colors["Arrhythmia"], alpha = 0.8, width = 0.6) +
-  geom_text(aes(label = paste0("n = ", n, "\n", round(percent_of_pathologies, 1), "% of anomalies")), vjust = -0.5, size = 4, fontface = "bold") +
-  # Add 15% padding at the top to ensure labels don't get clipped
-  scale_y_continuous(expand = expansion(mult = c(0, 0.15)))+
-  labs(
-    title = "Detailed Distribution of Arrhythmia Classes",
-    subtitle = "Analysis of apthological samples only to highlight minority class imbalances",
-    x = "Arrhythmia Type",
-    y = "Count",
-    fill = "Type"
-  ) +
-  theme_minimal() +
-  theme(
-    legend.position = "none",
-    plot.title = element_text(face = "bold", size = 16),
-    panel.grid.minor = element_blank(),
-    panel.spacing = unit(1, "lines")
-  )
-```
 
 ```{r}
 #| label: fig-acf-final-dashboard
@@ -268,3 +270,5 @@ p_right <- acf_results %>%
 
 p_left + p_right + plot_layout(widths = c(1, 1.8))
 ```
+
+
